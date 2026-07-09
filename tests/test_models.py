@@ -145,6 +145,20 @@ def test_internal_citation_map_ignores_non_dict_ref_id() -> None:
     assert msg.internal_citation_map == {}
 
 
+def test_message_missing_status_and_weight_uses_defaults() -> None:
+    """Test that messages without status/weight validate (July 2026 exports)."""
+    msg = Message.model_validate(
+        {
+            "id": "msg",
+            "author": {"name": None, "role": "tool", "metadata": {}},
+            "content": {"content_type": "text", "parts": ["hello"]},
+            "metadata": {},
+        }
+    )
+    assert msg.status == "finished_successfully"
+    assert msg.weight == 1.0
+
+
 def test_conversation_citation_map_aggregates_metadata_groups() -> None:
     """Test that citation_map aggregates from metadata.search_result_groups."""
     ts = datetime(2024, 1, 1, tzinfo=UTC).timestamp()

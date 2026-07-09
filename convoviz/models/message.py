@@ -69,9 +69,10 @@ class Message(BaseModel):
     create_time: datetime | None = None
     update_time: datetime | None = None
     content: MessageContent
-    status: str
+    # ChatGPT exports from ~July 2026 omit status/weight on some messages
+    status: str = "finished_successfully"
     end_turn: bool | None = None
-    weight: float
+    weight: float = 1.0
     metadata: MessageMetadata = Field(default_factory=MessageMetadata)
     recipient: str | None = None
 
