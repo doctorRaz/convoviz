@@ -111,7 +111,7 @@ def _build_markdown_filename(
     suffix: str = ".md",
     max_length: int = 255,
 ) -> str:
-    sanitized_title = sanitize(title)
+    sanitized_title = sanitize(title, preserve_unicode=True)
     prefix = (
         f"{create_time.strftime('%Y-%m-%d_%H-%M-%S')} - " if prepend_timestamp else ""
     )
@@ -141,7 +141,7 @@ def save_conversation(
     title exists, it overwrites it ONLY if it belongs to the same conversation ID.
     Otherwise, it increments the filename.
     """
-    base_name = sanitize(filepath.stem)
+    base_name = sanitize(filepath.stem, preserve_unicode=True)
     final_path = filepath
     counter = 0
 

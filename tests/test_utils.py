@@ -148,7 +148,7 @@ class TestPathNormalization:
     def test_expand_path_env_and_home(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("CONVOVIZ_TEST", "abc")
         result = expand_path("~/$CONVOVIZ_TEST")
-        assert str(result).endswith("/abc")
+        assert result == Path.home() / "abc"
 
     def test_normalize_optional_path_none_or_empty(self) -> None:
         assert normalize_optional_path(None) is None
