@@ -342,6 +342,7 @@ def load_conversations(path):
     data = json.loads(path.read_text())
     return data["conversations"] if isinstance(data, dict) else data
 
+
 def iter_messages(conversation):
     mapping = conversation.get("mapping", {})
     node_id = conversation.get("current_node")

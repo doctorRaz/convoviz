@@ -39,6 +39,7 @@ def year_start(dt: datetime) -> datetime:
 
 def sanitize(text: str, *, preserve_unicode: bool = False) -> str:
     """Sanitize a string to be safe for filenames and YAML titles.
+
     - Transliterates non-ASCII to ASCII when possible, unless Unicode is preserved.
     - Removes non-ASCII that cannot be converted unless Unicode is preserved.
     - Replaces invalid characters with spaces.
