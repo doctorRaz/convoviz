@@ -28,6 +28,8 @@ class TestSanitize:
         assert sanitize("file:name") == "file name"
         assert sanitize("path/to\\file") == "path to file"
         assert sanitize("test?query*") == "test query"
+        assert sanitize("Hello#World") == "Hello World"
+        assert sanitize("### Title ###") == "Title"
 
     def test_sanitize_with_newlines(self) -> None:
         """Test sanitizing strings with newlines."""
@@ -79,7 +81,6 @@ class TestSanitize:
         input_str = " @[Mörön] - 100% Crème brûlée! 😀 "
         # 1. Transliterate: " @[Moron] - 100% Creme brulee!  "
         # 2. Invalid chars (@, [, ], %, !): "  Moron - 100 Creme brulee  "
-        # 3. Collapse/Strip: "Moron - 100 Creme brulee"
         # Wait, [ ] and % and ! are NOT in the invalid set pattern [@<>:\"/\\|?*\n\r\t\f\v]+
         # So they remain if they are ASCII.
         # My current pattern is [@<>:\"/\\|?*\n\r\t\f\v]+
