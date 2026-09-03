@@ -98,7 +98,9 @@ class TestSanitize:
             "Синонимы для каталога"
         )
 
-    def test_sanitize_preserves_unicode_but_removes_invalid_filename_chars(self) -> None:
+    def test_sanitize_preserves_unicode_but_removes_invalid_filename_chars(
+        self,
+    ) -> None:
         """Test Unicode preservation does not bypass filename sanitization."""
         assert sanitize("Синонимы: для/каталога?", preserve_unicode=True) == (
             "Синонимы для каталога"
