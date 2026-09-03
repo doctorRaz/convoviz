@@ -80,9 +80,9 @@ class TestSanitize:
         # 1. Transliterate: " @[Moron] - 100% Creme brulee!  "
         # 2. Invalid chars (@, [, ], %, !): "  Moron - 100 Creme brulee  "
         # 3. Collapse/Strip: "Moron - 100 Creme brulee"
-        # Wait, [ ] and % and ! are NOT in the invalid set pattern [@<>:"/\\|?*\n\r\t\f\v]+
+        # Wait, [ ] and % and ! are NOT in the invalid set pattern [@<>:\"/\\|?*\n\r\t\f\v]+
         # So they remain if they are ASCII.
-        # My current pattern is [@<>:"/\\|?*\n\r\t\f\v]+
+        # My current pattern is [@<>:\"/\\|?*\n\r\t\f\v]+
         # Let's see what happens.
         result = sanitize(input_str)
         assert "Moron" in result
@@ -90,6 +90,23 @@ class TestSanitize:
         assert "😀" not in result
         # Check that it is purely ASCII
         result.encode("ascii")
+
+    def test_sanitize_preserves_cyrillic_when_requested(self) -> None:
+        """Test that Unicode letters are preserved when requested."""
+        assert sanitize("Синонимы для каталога", preserve_unicode=True) == (
+            "Синонимы для каталога"
+        )
+
+    def test_sanitize_preserves_unicode_but_removes_invalid_filename_chars(self) -> None:
+        """Test Unicode preservation does not bypass filename sanitization."""
+        assert sanitize("Синонимы: для/каталога?", preserve_unicode=True) == (
+            "Синонимы для каталога"
+        )
+
+    def test_sanitize_normalizes_preserved_unicode(self) -> None:
+        """Test that preserved Unicode is normalized to NFC."""
+        decomposed = "и\u0306"
+        assert sanitize(decomposed, preserve_unicode=True) == "й"
 
 
 class TestValidateHeader:
