@@ -71,7 +71,7 @@ def sanitize(text: str, *, preserve_unicode: bool = False) -> str:
 
     # 3. Replace invalid characters with spaces
     # (including @ which messes with some PDF tools)
-    pattern = re.compile(r'[@<>:"/\\|?*\n\r\t\f\v]+')
+    pattern = re.compile(r'[@<>:"/\\|?*\n\r\t\f\v#]+')
     result = pattern.sub(" ", ascii_text)
 
     # 4. Prevent path traversal by replacing dots with spaces
