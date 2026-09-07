@@ -8,7 +8,9 @@ from convoviz.io.writers import save_conversation
 from convoviz.models import Conversation
 
 
-def create_conversation(title: str, update_time: datetime, conversation_id: str) -> Conversation:
+def create_conversation(
+    title: str, update_time: datetime, conversation_id: str
+) -> Conversation:
     """Create a minimal conversation for overwrite tests."""
     return Conversation(
         title=title,
@@ -103,7 +105,9 @@ def test_missing_existing_update_time_keeps_legacy_overwrite(tmp_path: Path) -> 
     assert "New" in path.read_text(encoding="utf-8")
 
 
-def test_different_conversation_id_still_creates_incremented_file(tmp_path: Path) -> None:
+def test_different_conversation_id_still_creates_incremented_file(
+    tmp_path: Path,
+) -> None:
     """A different conversation ID keeps the existing suffix-based conflict behavior."""
     path = tmp_path / "Test.md"
     first = create_conversation("First", datetime(2024, 1, 1, 12, tzinfo=UTC), "id1")
