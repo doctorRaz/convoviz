@@ -118,9 +118,7 @@ def _build_markdown_filename(
 ) -> str:
     sanitized_title = sanitize(title, preserve_unicode=True)
     prefix = (
-        f"{create_time.strftime('%Y-%m-%d_%H-%M-%S')} - "
-        if prepend_timestamp
-        else ""
+        f"{create_time.strftime('%Y-%m-%d_%H-%M-%S')} - " if prepend_timestamp else ""
     )
     available = max_length - len(prefix) - len(suffix)
     truncated = "untitled" if available < 1 else sanitized_title[:available]
@@ -164,16 +162,12 @@ def save_conversation(
             break
 
         counter += 1
-        final_path = filepath.with_name(
-            f"{base_name} ({counter}){filepath.suffix}"
-        )
+        final_path = filepath.with_name(f"{base_name} ({counter}){filepath.suffix}")
 
     if asset_indexes is None:
         asset_indexes = {}
         if source_paths:
-            asset_indexes = {
-                path: build_asset_index(path) for path in source_paths
-            }
+            asset_indexes = {path: build_asset_index(path) for path in source_paths}
 
     def asset_resolver(asset_id: str, target_name: str | None = None) -> str | None:
         if not source_paths:
@@ -248,9 +242,7 @@ def _generate_month_index(
 ) -> None:
     """Generate a _index.md file for a month folder."""
     month_name = month.split("-", 1)[1] if "-" in month else month
-    files = sorted(
-        [f.name for f in month_dir.glob("*.md") if f.name != "_index.md"]
-    )
+    files = sorted([f.name for f in month_dir.glob("*.md") if f.name != "_index.md"])
     lines = [f"# {month_name} {year}", "", "## Conversations", ""]
     for file in files:
         title = file[:-3]
