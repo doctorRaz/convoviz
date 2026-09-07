@@ -25,52 +25,22 @@ logger = logging.getLogger(__name__)
 
 # Month names for folder naming
 _MONTH_NAMES = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
 ]
 
 
 def get_date_folder_path(conversation: Conversation) -> Path:
-    """Get the date-based folder path for a conversation.
-
-    Creates a nested structure: year/month
-    Example: 2024/03-March/
-
-    Args:
-        conversation: The conversation to get the path for
-
-    Returns:
-        Relative path for the date-based folder structure
-
-    """
+    """Get the date-based folder path for a conversation."""
     create_time = conversation.create_time
-
-    # Year folder: "2024"
-    year = str(create_time.year)
-
-    # Month folder: "03-March"
-    month_num = create_time.month
-    month_name = _MONTH_NAMES[month_num - 1]
-    month = f"{month_num:02d}-{month_name}"
-
-    return Path(year) / month
+    return Path(str(create_time.year)) / f"{create_time.month:02d}-{_MONTH_NAMES[create_time.month - 1]}"
 
 
 _ID_SCAN_LIMIT = 128 * 1024
 
 
-def _get_conversation_id_from_file(filepath: Path) -> str | None:
-    """Extract conversation_id from an existing markdown file's YAML frontmatter.
+def _get_conversation_metadata_from_file(filepath: Path) -> tuple[str | None, datetime | None]:
+    """Extract conversation_id and update_time from an existing Markdown file.
 
     Scans a bounded prefix of the file to avoid loading huge files.
     """
@@ -78,29 +48,40 @@ def _get_conversation_id_from_file(filepath: Path) -> str | None:
         with filepath.open("r", encoding="utf-8") as f:
             content = f.read(_ID_SCAN_LIMIT)
 
-        # Check hidden marker first
-        marker = re.search(
-            r"<!--\s*conversation_id=([^>\s]+)\s*-->",
-            content,
-            re.IGNORECASE,
-        )
+        conversation_id: str | None = None
+        marker = re.search(r"<!--\s*conversation_id=([^>\s]+)\s*-->", content, re.IGNORECASE)
         if marker:
-            return marker.group(1)
-        # Look for conversation_id: "id"
-        match = re.search(r'^conversation_id:\s*"([^"]+)"', content, re.MULTILINE)
+            conversation_id = marker.group(1)
+        else:
+            match = re.search(r'^conversation_id:\s*"([^"]+)"', content, re.MULTILINE)
+            if match:
+                conversation_id = match.group(1)
+            else:
+                match = re.search(
+                    r'^chat_link:\s*"https://(?:chatgpt\.com|chat\.openai\.com)/c/([^"]+)"',
+                    content,
+                    re.MULTILINE,
+                )
+                if match:
+                    conversation_id = match.group(1)
+
+        update_time: datetime | None = None
+        match = re.search(r'^update_time:\s*"([^"]+)"', content, re.MULTILINE)
         if match:
-            return match.group(1)
-        # Fallback: check chat_link
-        match = re.search(
-            r'^chat_link:\s*"https://(?:chatgpt\.com|chat\.openai\.com)/c/([^"]+)"',
-            content,
-            re.MULTILINE,
-        )
-        if match:
-            return match.group(1)
+            try:
+                update_time = datetime.fromisoformat(match.group(1))
+            except ValueError:
+                pass
+
+        return conversation_id, update_time
     except Exception:
-        pass
-    return None
+        return None, None
+
+
+def _get_conversation_id_from_file(filepath: Path) -> str | None:
+    """Extract conversation_id from an existing markdown file's YAML frontmatter."""
+    conversation_id, _ = _get_conversation_metadata_from_file(filepath)
+    return conversation_id
 
 
 def _build_markdown_filename(
@@ -112,18 +93,9 @@ def _build_markdown_filename(
     max_length: int = 255,
 ) -> str:
     sanitized_title = sanitize(title, preserve_unicode=True)
-    prefix = (
-        f"{create_time.strftime('%Y-%m-%d_%H-%M-%S')} - " if prepend_timestamp else ""
-    )
+    prefix = f"{create_time.strftime('%Y-%m-%d_%H-%M-%S')} - " if prepend_timestamp else ""
     available = max_length - len(prefix) - len(suffix)
-    if available < 1:
-        truncated = "untitled"
-    else:
-        truncated = (
-            sanitized_title[:available]
-            if len(sanitized_title) > available
-            else sanitized_title
-        )
+    truncated = "untitled" if available < 1 else sanitized_title[:available]
     return f"{prefix}{truncated}{suffix}"
 
 
@@ -137,22 +109,27 @@ def save_conversation(
 ) -> Path:
     """Save a conversation to a markdown file.
 
-    Handles filename conflicts by appending a counter. If a file with the same
-    title exists, it overwrites it ONLY if it belongs to the same conversation ID.
-    Otherwise, it increments the filename.
+    Same conversation IDs identify the same conversation. For an existing file
+    with that ID, a newer incoming update_time replaces it; an equal or older
+    incoming update_time is skipped. If the existing update_time is missing,
+    the legacy overwrite behavior is preserved. Different IDs still use suffixes.
     """
     base_name = sanitize(filepath.stem, preserve_unicode=True)
     final_path = filepath
     counter = 0
 
     while final_path.exists():
-        # Check if this existing file is the SAME conversation
-        existing_id = _get_conversation_id_from_file(final_path)
+        existing_id, existing_update_time = _get_conversation_metadata_from_file(final_path)
         if existing_id == conversation.conversation_id:
+            if existing_update_time is not None and conversation.update_time <= existing_update_time:
+                logger.debug(
+                    f"Skipping {final_path.name}: existing update_time "
+                    f"{existing_update_time.isoformat()} is newer or equal."
+                )
+                return final_path
             logger.debug(f"Identity match for {final_path.name}, overwriting.")
             break
 
-        # Different conversation with same title, increment
         counter += 1
         final_path = filepath.with_name(f"{base_name} ({counter}){filepath.suffix}")
 
@@ -161,37 +138,22 @@ def save_conversation(
         if source_paths:
             asset_indexes = {path: build_asset_index(path) for path in source_paths}
 
-    # Define asset resolver
     def asset_resolver(asset_id: str, target_name: str | None = None) -> str | None:
         if not source_paths:
             return None
-
         for source_path in source_paths:
-            src_file = resolve_asset_path(
-                source_path, asset_id, index=asset_indexes.get(source_path)
-            )
+            src_file = resolve_asset_path(source_path, asset_id, index=asset_indexes.get(source_path))
             if src_file:
-                # Copy to output directory (relative to the markdown file's directory)
-                return copy_asset(
-                    src_file,
-                    final_path.parent,
-                    target_name,
-                )
-
+                return copy_asset(src_file, final_path.parent, target_name)
         return None
 
-    # Render and write
-    markdown = render_conversation(
-        conversation, config, headers, asset_resolver=asset_resolver
-    )
+    markdown = render_conversation(conversation, config, headers, asset_resolver=asset_resolver)
     with final_path.open("w", encoding="utf-8") as f:
         f.write(markdown)
     logger.debug(f"Saved conversation: {final_path}")
 
-    # Set modification time
     timestamp = conversation.update_time.timestamp()
     os_utime(final_path, (timestamp, timestamp))
-
     return final_path
 
 
@@ -203,22 +165,11 @@ def _generate_year_index(year_dir: Path, year: str) -> None:
         year: The year string (e.g., "2024")
 
     """
-    months = sorted(
-        [d.name for d in year_dir.iterdir() if d.is_dir()],
-        key=lambda m: int(m.split("-")[0]),
-    )
-
-    lines = [
-        f"# {year}",
-        "",
-        "## Months",
-        "",
-    ]
-
+    months = sorted([d.name for d in year_dir.iterdir() if d.is_dir()], key=lambda m: int(m.split("-")[0]))
+    lines = [f"# {year}", "", "## Months", ""]
     for month in months:
         month_name = month.split("-", 1)[1] if "-" in month else month
         lines.append(f"- [{month_name}]({month}/_index.md)")
-
     index_path = year_dir / "_index.md"
     index_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     logger.debug(f"Generated year index: {index_path}")
@@ -226,61 +177,28 @@ def _generate_year_index(year_dir: Path, year: str) -> None:
 
 def _generate_root_index(root_dir: Path) -> None:
     """Generate a top-level _index.md that links to year indexes."""
-    years = sorted(
-        [d.name for d in root_dir.iterdir() if d.is_dir() and d.name.isdigit()]
-    )
+    years = sorted([d.name for d in root_dir.iterdir() if d.is_dir() and d.name.isdigit()])
     if not years:
         return
-
-    lines = [
-        "# ChatGPT Conversations",
-        "",
-        "## Years",
-        "",
-    ]
-
+    lines = ["# ChatGPT Conversations", "", "## Years", ""]
     for year in years:
         encoded = quote(f"{year}/_index.md")
         lines.append(f"- [{year}]({encoded})")
-
     index_path = root_dir / "_index.md"
     index_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     logger.debug(f"Generated root index: {index_path}")
 
 
-def _generate_month_index(
-    month_dir: Path,
-    year: str,
-    month: str,
-    filename_to_title: dict[str, str] | None = None,
-) -> None:
-    """Generate a _index.md file for a month folder.
-
-    Args:
-        month_dir: Path to the month directory
-        year: The year string (e.g., "2024")
-        month: The month folder name (e.g., "03-March")
-        filename_to_title: Mapping of filename to original conversation title
-
-    """
+def _generate_month_index(month_dir: Path, year: str, month: str, filename_to_title: dict[str, str] | None = None) -> None:
+    """Generate a _index.md file for a month folder."""
     month_name = month.split("-", 1)[1] if "-" in month else month
     files = sorted([f.name for f in month_dir.glob("*.md") if f.name != "_index.md"])
-
-    lines = [
-        f"# {month_name} {year}",
-        "",
-        "## Conversations",
-        "",
-    ]
-
+    lines = [f"# {month_name} {year}", "", "## Conversations", ""]
     for file in files:
-        title = file[:-3]  # Fallback to filename
+        title = file[:-3]
         if filename_to_title and file in filename_to_title:
             title = filename_to_title[file]
-
-        encoded_file = quote(file)
-        lines.append(f"- [{title}]({encoded_file})")
-
+        lines.append(f"- [{title}]({quote(file)})")
     index_path = month_dir / "_index.md"
     index_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     logger.debug(f"Generated month index: {index_path}")
@@ -296,98 +214,40 @@ def save_collection(
     prepend_timestamp: bool = False,
     progress_bar: bool = False,
 ) -> None:
-    """Save all conversations in a collection to markdown files.
-
-    Args:
-        collection: The collection to save
-        directory: Target directory
-        config: Conversation rendering configuration
-        headers: Author header configuration
-        folder_organization: How to organize files in folders (flat or by date)
-        prepend_timestamp: Whether to prepend the conversation timestamp to the filename
-        progress_bar: Whether to show a progress bar
-
-    """
+    """Save all conversations in a collection to markdown files."""
     directory.mkdir(parents=True, exist_ok=True)
-
     asset_indexes: dict[Path, AssetIndex] | None = None
     if collection.source_paths:
-        asset_indexes = {
-            path: build_asset_index(path) for path in collection.source_paths
-        }
-
-    # Track original titles for index generation
-    # Key: "year/month/filename" (relative to directory)
+        asset_indexes = {path: build_asset_index(path) for path in collection.source_paths}
     filename_to_title: dict[str, str] = {}
 
-    for conv in tqdm(
-        collection.conversations,
-        desc="Writing Markdown 📄 files",
-        disable=not progress_bar,
-    ):
-        # Determine target directory based on organization setting
+    for conv in tqdm(collection.conversations, desc="Writing Markdown 📄 files", disable=not progress_bar):
         if folder_organization == FolderOrganization.DATE:
             date_folder = get_date_folder_path(conv)
             target_dir = directory / date_folder
             target_dir.mkdir(parents=True, exist_ok=True)
         else:
             target_dir = directory
-
-        # Determine filename
-        filename = _build_markdown_filename(
-            conv.title,
-            prepend_timestamp=prepend_timestamp,
-            create_time=conv.create_time,
-        )
-
+        filename = _build_markdown_filename(conv.title, prepend_timestamp=prepend_timestamp, create_time=conv.create_time)
         filepath = target_dir / filename
-        saved_path = save_conversation(
-            conv,
-            filepath,
-            config,
-            headers,
-            source_paths=collection.source_paths,
-            asset_indexes=asset_indexes,
-        )
-
-        # Update title mapping with the FINAL filename (after deduplication)
+        saved_path = save_conversation(conv, filepath, config, headers, source_paths=collection.source_paths, asset_indexes=asset_indexes)
         rel_path = saved_path.relative_to(directory)
         filename_to_title[str(rel_path)] = conv.title
 
-    # Generate index files for date organization
     if folder_organization == FolderOrganization.DATE:
         for year_dir in directory.iterdir():
             if year_dir.is_dir() and year_dir.name.isdigit():
                 for month_dir in year_dir.iterdir():
                     if month_dir.is_dir():
-                        # Filter mapping for this specific month
                         month_rel = month_dir.relative_to(directory)
-                        month_mapping = {
-                            Path(p).name: t
-                            for p, t in filename_to_title.items()
-                            if p.startswith(str(month_rel))
-                        }
-                        _generate_month_index(
-                            month_dir,
-                            year_dir.name,
-                            month_dir.name,
-                            filename_to_title=month_mapping,
-                        )
+                        month_mapping = {Path(p).name: t for p, t in filename_to_title.items() if p.startswith(str(month_rel))}
+                        _generate_month_index(month_dir, year_dir.name, month_dir.name, filename_to_title=month_mapping)
                 _generate_year_index(year_dir, year_dir.name)
         _generate_root_index(directory)
 
 
-def save_custom_instructions(
-    collection: ConversationCollection,
-    filepath: Path,
-) -> None:
-    """Save all custom instructions from a collection to a JSON file.
-
-    Args:
-        collection: The collection to extract instructions from
-        filepath: Target JSON file path
-
-    """
+def save_custom_instructions(collection: ConversationCollection, filepath: Path) -> None:
+    """Save all custom instructions from a collection to a JSON file."""
     instructions = collection.custom_instructions
     with filepath.open("w", encoding="utf-8") as f:
         f.write(dumps(instructions, option=OPT_INDENT_2).decode())
