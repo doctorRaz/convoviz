@@ -71,9 +71,7 @@ if existing_id == conversation.conversation_id:
 
 ```python
 counter += 1
-final_path = filepath.with_name(
-    f"{base_name} ({counter}){filepath.suffix}"
-)
+final_path = filepath.with_name(f"{base_name} ({counter}){filepath.suffix}")
 ```
 
 Получается:
