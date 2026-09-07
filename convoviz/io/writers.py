@@ -96,10 +96,10 @@ def _get_conversation_metadata_from_file(
         if match:
             with contextlib.suppress(ValueError):
                 update_time = datetime.fromisoformat(match.group(1))
-
-        return conversation_id, update_time
     except Exception:
         return None, None
+    else:
+        return conversation_id, update_time
 
 
 def _get_conversation_id_from_file(filepath: Path) -> str | None:
