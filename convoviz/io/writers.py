@@ -78,7 +78,12 @@ def _get_conversation_id_from_file(filepath: Path) -> str | None:
         with filepath.open("r", encoding="utf-8") as f:
             content = f.read(_ID_SCAN_LIMIT)
 
-        # Check hidden marker first
+        # Check YAML conversation_id first: it is authoritative metadata.
+        match = re.search(r'^conversation_id:\s*"([^"]+)"', content, re.MULTILINE)
+        if match:
+            return match.group(1)
+
+        # Fallback: check hidden marker.
         marker = re.search(
             r"<!--\s*conversation_id=([^>\s]+)\s*-->",
             content,
@@ -86,11 +91,8 @@ def _get_conversation_id_from_file(filepath: Path) -> str | None:
         )
         if marker:
             return marker.group(1)
-        # Look for conversation_id: "id"
-        match = re.search(r'^conversation_id:\s*"([^"]+)"', content, re.MULTILINE)
-        if match:
-            return match.group(1)
-        # Fallback: check chat_link
+
+        # Fallback: check chat_link.
         match = re.search(
             r'^chat_link:\s*"https://(?:chatgpt\.com|chat\.openai\.com)/c/([^"]+)"',
             content,
