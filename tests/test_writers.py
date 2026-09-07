@@ -128,7 +128,6 @@ class TestSaveCollectionWithDateOrganization:
             "conv2",
         )
         collection = ConversationCollection(conversations=[conv1, conv2])
-
         save_collection(
             collection,
             tmp_path,
@@ -136,8 +135,6 @@ class TestSaveCollectionWithDateOrganization:
             AuthorHeaders(),
             folder_organization=FolderOrganization.FLAT,
         )
-
-        # Files should be in root directory
         assert (tmp_path / "Conv Jan.md").exists()
         assert (tmp_path / "Conv Mar.md").exists()
 
@@ -154,7 +151,6 @@ class TestSaveCollectionWithDateOrganization:
             "conv2",
         )
         collection = ConversationCollection(conversations=[conv1, conv2])
-
         save_collection(
             collection,
             tmp_path,
@@ -162,8 +158,6 @@ class TestSaveCollectionWithDateOrganization:
             AuthorHeaders(),
             folder_organization=FolderOrganization.DATE,
         )
-
-        # Files should be in date folders (year/month, no week)
         assert (tmp_path / "2024" / "01-January" / "Conv Jan.md").exists()
         assert (tmp_path / "2024" / "03-March" / "Conv Mar.md").exists()
 
@@ -180,7 +174,6 @@ class TestSaveCollectionWithDateOrganization:
             "conv2",
         )
         collection = ConversationCollection(conversations=[conv1, conv2])
-
         save_collection(
             collection,
             tmp_path,
@@ -188,8 +181,6 @@ class TestSaveCollectionWithDateOrganization:
             AuthorHeaders(),
             folder_organization=FolderOrganization.DATE,
         )
-
-        # Both should be in the same month folder
         month_folder = tmp_path / "2024" / "03-March"
         assert (month_folder / "Early Month Chat.md").exists()
         assert (month_folder / "Late Month Chat.md").exists()
@@ -207,7 +198,6 @@ class TestSaveCollectionWithDateOrganization:
             "conv2",
         )
         collection = ConversationCollection(conversations=[conv_2023, conv_2024])
-
         save_collection(
             collection,
             tmp_path,
@@ -215,7 +205,6 @@ class TestSaveCollectionWithDateOrganization:
             AuthorHeaders(),
             folder_organization=FolderOrganization.DATE,
         )
-
         assert (tmp_path / "2023" / "12-December" / "Old Chat.md").exists()
         assert (tmp_path / "2024" / "01-January" / "New Chat.md").exists()
 
@@ -237,7 +226,6 @@ class TestSaveCollectionWithDateOrganization:
             "conv3",
         )
         collection = ConversationCollection(conversations=[conv1, conv2, conv3])
-
         save_collection(
             collection,
             tmp_path,
@@ -245,16 +233,12 @@ class TestSaveCollectionWithDateOrganization:
             AuthorHeaders(),
             folder_organization=FolderOrganization.DATE,
         )
-
-        # Check year index
         year_index = tmp_path / "2024" / "_index.md"
         assert year_index.exists()
         year_content = year_index.read_text()
         assert "# 2024" in year_content
         assert "[January]" in year_content
         assert "[March]" in year_content
-
-        # Check month index
         jan_index = tmp_path / "2024" / "01-January" / "_index.md"
         assert jan_index.exists()
         jan_content = jan_index.read_text()
@@ -263,16 +247,14 @@ class TestSaveCollectionWithDateOrganization:
         assert "[Chat Two]" in jan_content
 
     def test_index_uses_original_title(self, tmp_path: Path) -> None:
-        """Test that _index.md uses the original title even if filename is sanitized."""
+        """Test that _index.md uses the original title if filename is sanitized."""
         original_title = "My @Title's Case"
-        # Sanitize would be "My Title s Case" (since @ removed, ' replaced by space)
         conv = create_conversation(
             original_title,
             datetime(2024, 1, 5, 10, 0, tzinfo=UTC),
             "conv1",
         )
         collection = ConversationCollection(conversations=[conv])
-
         save_collection(
             collection,
             tmp_path,
@@ -280,13 +262,9 @@ class TestSaveCollectionWithDateOrganization:
             AuthorHeaders(),
             folder_organization=FolderOrganization.DATE,
         )
-
         jan_index = tmp_path / "2024" / "01-January" / "_index.md"
         assert jan_index.exists()
         jan_content = jan_index.read_text()
-
-        # Link should be [Original Title](sanitized_filename.md)
-        # Sanitized filename: "My Title s Case.md" (quoted)
         expected_link = f"[{original_title}](My%20Title%20s%20Case.md)"
         assert expected_link in jan_content
 
@@ -298,7 +276,6 @@ class TestSaveCollectionWithDateOrganization:
             "conv1",
         )
         collection = ConversationCollection(conversations=[conv])
-
         save_collection(
             collection,
             tmp_path,
@@ -306,8 +283,6 @@ class TestSaveCollectionWithDateOrganization:
             AuthorHeaders(),
             folder_organization=FolderOrganization.FLAT,
         )
-
-        # No index files should be created in flat mode
         assert not (tmp_path / "_index.md").exists()
         assert not list(tmp_path.glob("**/_index.md"))
 
@@ -319,7 +294,6 @@ class TestSaveCollectionWithDateOrganization:
             "conv1",
         )
         collection = ConversationCollection(conversations=[conv])
-
         save_collection(
             collection,
             tmp_path,
@@ -328,7 +302,6 @@ class TestSaveCollectionWithDateOrganization:
             folder_organization=FolderOrganization.FLAT,
             prepend_timestamp=True,
         )
-
         expected_filename = "2024-03-21_15-30-05 - My Chat.md"
         assert (tmp_path / expected_filename).exists()
 
@@ -389,14 +362,11 @@ def test_save_conversation_overwrite_with_large_frontmatter(tmp_path: Path) -> N
         current_node="user_node",
         conversation_id="big_yaml_conv",
     )
-
     config = ConversationConfig(yaml=YAMLConfig(custom_instructions=True))
     headers = AuthorHeaders()
     path = tmp_path / "Big YAML.md"
-
     save_conversation(conv, path, config, headers)
     save_conversation(conv, path, config, headers)
-
     assert path.exists()
     assert not (tmp_path / "Big YAML (1).md").exists()
 
@@ -412,20 +382,17 @@ class TestSaveConversation:
             "conv1",
         )
         filepath = tmp_path / "test.md"
-
         result = save_conversation(
             conv,
             filepath,
             ConversationConfig(),
             AuthorHeaders(),
         )
-
         assert result.exists()
         assert result == filepath
 
     def test_save_handles_conflict_different_id(self, tmp_path: Path) -> None:
         """Test that same title but different ID results in increments."""
-        # Save first conversation
         conv1 = create_conversation(
             "Test Conv",
             datetime(2024, 1, 5, 10, 0, tzinfo=UTC),
@@ -433,8 +400,6 @@ class TestSaveConversation:
         )
         filepath = tmp_path / "test.md"
         save_conversation(conv1, filepath, ConversationConfig(), AuthorHeaders())
-
-        # Save second conversation with SAME title but DIFFERENT id
         conv2 = create_conversation(
             "Test Conv",
             datetime(2024, 1, 5, 10, 0, tzinfo=UTC),
@@ -446,41 +411,25 @@ class TestSaveConversation:
             ConversationConfig(),
             AuthorHeaders(),
         )
-
-        # Should increment
         assert result.name == "test (1).md"
         assert filepath.exists()
 
     def test_save_overwrites_same_identity(self, tmp_path: Path) -> None:
-        """Test that same title AND same ID results in overwrite."""
-        # Save first version
-        conv1 = create_conversation(
-            "Test Conv",
-            datetime(2024, 1, 5, 10, 0, tzinfo=UTC),
-            "id1",
-        )
+        """Test that a newer update_time overwrites the same conversation."""
+        initial_time = datetime(2024, 1, 5, 10, 0, tzinfo=UTC)
+        updated_time = datetime(2024, 1, 5, 11, 0, tzinfo=UTC)
+        conv1 = create_conversation("Test Conv", initial_time, "id1")
         filepath = tmp_path / "test.md"
         save_conversation(conv1, filepath, ConversationConfig(), AuthorHeaders())
-
         assert "Hello" in filepath.read_text()
-
-        # Update it (e.g. change content in mock)
-        conv1_updated = create_conversation(
-            "Test Conv",
-            datetime(2024, 1, 5, 10, 0, tzinfo=UTC),
-            "id1",
-        )
-        # Use a completely different content to check overwrite
+        conv1_updated = create_conversation("Test Conv", updated_time, "id1")
         conv1_updated.mapping["user_node"].message.content.parts = ["Something Else"]
-
         result = save_conversation(
             conv1_updated,
             filepath,
             ConversationConfig(),
             AuthorHeaders(),
         )
-
-        # Should OVERWRITE (same path, no counter)
         assert result == filepath
         assert "Something Else" in filepath.read_text()
         assert "Hello" not in filepath.read_text()
