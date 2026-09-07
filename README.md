@@ -37,6 +37,55 @@
 
 ---
 
+## Fork differences
+
+This fork contains additional changes that are not yet part of the upstream
+[`mohamed-chs/convoviz`](https://github.com/mohamed-chs/convoviz) project.
+
+The `main` branch tracks the upstream project.
+The `develop` branch contains the current development version of this fork.
+
+Current differences include:
+
+- **Filename sanitization**
+  - `#` is sanitized to avoid conflicts with Obsidian heading links.
+
+- **Conversation ID detection**
+  - YAML `conversation_id` has priority over conversation ID markers found in document content.
+  - The HTML `conversation_id` marker is used as a fallback.
+  - `chat_link` is used as a final fallback when available.
+
+- **CI**
+  - GitHub Actions CI is configured to run automatically for `develop`.
+  - The workflow can also be started manually with `workflow_dispatch`.
+
+<details>
+<summary><strong>Русская версия</strong></summary>
+
+Этот fork содержит дополнительные изменения, которых пока нет в исходном проекте
+[`mohamed-chs/convoviz`](https://github.com/mohamed-chs/convoviz).
+
+Ветка `main` отслеживает исходный проект.
+Ветка `develop` содержит текущую разрабатываемую версию этого fork.
+
+Текущие отличия:
+
+- **Нормализация имён файлов**
+  - Символ `#` заменяется при нормализации имени файла, чтобы избежать конфликтов с якорями заголовков Obsidian.
+
+- **Определение Conversation ID**
+  - `conversation_id` из YAML имеет приоритет над маркерами Conversation ID, найденными в содержимом документа.
+  - HTML-маркер `conversation_id` используется как резервный источник.
+  - `chat_link` используется как последний резервный источник, если он доступен.
+
+- **CI**
+  - GitHub Actions CI автоматически запускается для ветки `develop`.
+  - Workflow также можно запустить вручную через `workflow_dispatch`.
+
+</details>
+
+---
+
 ## How to Use
 
 ### Step 1: Export Your ChatGPT Data
