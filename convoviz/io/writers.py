@@ -387,7 +387,7 @@ def save_custom_instructions(
 
     Args:
         collection: The collection to extract instructions from
-        filepath: Target JSON file path
+        filepath: Target JSON file
 
     """
     instructions = collection.custom_instructions
