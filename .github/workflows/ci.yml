@@ -2,7 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - GPT/update-time-overwrite-check
   pull_request:
     branches: [main]
 
