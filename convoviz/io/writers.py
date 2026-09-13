@@ -120,6 +120,12 @@ def _get_conversation_metadata_from_file(
         return conversation_id, update_time
 
 
+def _get_conversation_id_from_file(filepath: Path) -> str | None:
+    """Extract conversation_id from an existing Markdown file."""
+    conversation_id, _ = _get_conversation_metadata_from_file(filepath)
+    return conversation_id
+
+
 def _build_markdown_filename(
     title: str,
     *,
@@ -414,7 +420,7 @@ def save_custom_instructions(
 
     Args:
         collection: The collection to extract instructions from
-        filepath: Target JSON file path
+        filepath: Target JSON file
 
     """
     instructions = collection.custom_instructions
