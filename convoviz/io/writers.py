@@ -1,5 +1,6 @@
 """Writing functions for conversations and collections."""
 
+import contextlib
 import logging
 import re
 from datetime import datetime
@@ -69,8 +70,10 @@ def get_date_folder_path(conversation: Conversation) -> Path:
 _ID_SCAN_LIMIT = 128 * 1024
 
 
-def _get_conversation_id_from_file(filepath: Path) -> str | None:
-    """Extract conversation_id from an existing markdown file's YAML frontmatter.
+def _get_conversation_metadata_from_file(
+    filepath: Path,
+) -> tuple[str | None, datetime | None]:
+    """Extract conversation_id and update_time from an existing Markdown file.
 
     Scans a bounded prefix of the file to avoid loading huge files.
     """
@@ -78,31 +81,43 @@ def _get_conversation_id_from_file(filepath: Path) -> str | None:
         with filepath.open("r", encoding="utf-8") as f:
             content = f.read(_ID_SCAN_LIMIT)
 
+        conversation_id: str | None = None
         # Check YAML conversation_id first: it is authoritative metadata.
         match = re.search(r'^conversation_id:\s*"([^"]+)"', content, re.MULTILINE)
         if match:
-            return match.group(1)
+            conversation_id = match.group(1)
+        else:
+            # Fallback: check hidden marker.
+            marker = re.search(
+                r"<!--\s*conversation_id=([^>\s]+)\s*-->",
+                content,
+                re.IGNORECASE,
+            )
+            if marker:
+                conversation_id = marker.group(1)
+            else:
+                # Fallback: check chat_link.
+                match = re.search(
+                    r'^chat_link:\s*"https://(?:chatgpt\.com|chat\.openai\.com)/c/([^"]+)"',
+                    content,
+                    re.MULTILINE,
+                )
+                if match:
+                    conversation_id = match.group(1)
 
-        # Fallback: check hidden marker.
-        marker = re.search(
-            r"<!--\s*conversation_id=([^>\s]+)\s*-->",
-            content,
-            re.IGNORECASE,
-        )
-        if marker:
-            return marker.group(1)
-
-        # Fallback: check chat_link.
+        update_time: datetime | None = None
         match = re.search(
-            r'^chat_link:\s*"https://(?:chatgpt\.com|chat\.openai\.com)/c/([^"]+)"',
+            r'^update_time:\s*"([^"]+)"',
             content,
             re.MULTILINE,
         )
         if match:
-            return match.group(1)
+            with contextlib.suppress(ValueError):
+                update_time = datetime.fromisoformat(match.group(1))
     except Exception:
-        pass
-    return None
+        return None, None
+    else:
+        return conversation_id, update_time
 
 
 def _build_markdown_filename(
@@ -139,18 +154,30 @@ def save_conversation(
 ) -> Path:
     """Save a conversation to a markdown file.
 
-    Handles filename conflicts by appending a counter. If a file with the same
-    title exists, it overwrites it ONLY if it belongs to the same conversation ID.
-    Otherwise, it increments the filename.
+    Same conversation IDs identify the same conversation. For an existing file
+    with that ID, a newer incoming update_time replaces it; an equal or older
+    incoming update_time is skipped. If the existing update_time is missing,
+    the legacy overwrite behavior is preserved. Different IDs still use suffixes.
     """
     base_name = sanitize(filepath.stem, preserve_unicode=True)
     final_path = filepath
     counter = 0
 
     while final_path.exists():
-        # Check if this existing file is the SAME conversation
-        existing_id = _get_conversation_id_from_file(final_path)
+        existing_id, existing_update_time = _get_conversation_metadata_from_file(
+            final_path
+        )
         if existing_id == conversation.conversation_id:
+            if (
+                existing_update_time is not None
+                and conversation.update_time <= existing_update_time
+            ):
+                logger.debug(
+                    f"Skipping {final_path.name}: existing update_time "
+                    f"{existing_update_time.isoformat()} is newer or equal."
+                )
+                return final_path
+
             logger.debug(f"Identity match for {final_path.name}, overwriting.")
             break
 
