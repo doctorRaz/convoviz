@@ -467,7 +467,7 @@ class TestSaveConversation:
         # Update it (e.g. change content in mock)
         conv1_updated = create_conversation(
             "Test Conv",
-            datetime(2024, 1, 5, 10, 0, tzinfo=UTC),
+            datetime(2024, 1, 5, 11, 0, tzinfo=UTC),
             "id1",
         )
         # Use a completely different content to check overwrite
